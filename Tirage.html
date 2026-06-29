@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tirage Padel automatique via Excel</title>
+    <!-- Librairie pour lire Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 { text-align: center; color: #1e3a8a; }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .file-input-container {
+            border: 2px dashed #10b981;
+            padding: 25px;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #f0fdf4;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .file-input-container input { display: none; }
+        button {
+            display: block;
+            width: 100%;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 15px;
+        }
+        button:hover { background-color: #059669; }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        #countdown {
+            text-align: center; font-size: 24px; font-weight: bold; color: #d97706; margin: 20px 0; display: none;
+        }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+        .tableau { margin-top: 20px; display: grid; grid-template-columns: 1fr; gap: 15px; }
+        .match {
+            background: #f8fafc; border-left: 5px solid #10b981; padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); opacity: 0; transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .match.visible { opacity: 1; transform: translateY(0); }
+        .match-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; font-weight: bold; }
+        .team {
+            padding: 10px 12px; margin: 6px 0; background: white; border: 1px solid #e2e8f0;
+            border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 15px;
+        }
+        .ts { background-color: #f0fdf4; border-color: #bbf7d0; font-weight: bold; color: #166534; }
+        .badge { font-size: 11px; background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; }
+        .poids { font-size: 12px; color: #64748b; font-style: italic; }
+        .list-paires { font-size: 13px; color: #475569; margin-top: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Tirage au Sort Officiel Padel</h1>
+    
+    <div class="container">
+        <h2>1. Importez le fichier Excel</h2>
+        <div class="file-input-container" onclick="document.getElementById('excel-file').click()">
+            <strong style="color: #059669;">👉 Cliquez ici pour charger "inscriptions (5).xls"</strong>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">(Lecture directe de l'onglet Inscriptions)</p>
+            <input type="file" id="excel-file" accept=".xls,.xlsx">
+        </div>
+        <div id="file-status" style="text-align:center; font-weight:bold; color: #16a34a; margin-bottom: 15px;"></div>
+        <div id="paires-detectees" class="list-paires"></div>
