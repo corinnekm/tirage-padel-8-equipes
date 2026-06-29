@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tirage Padel automatique via Excel</title>
+    <!-- Librairie pour lire Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 { text-align: center; color: #1e3a8a; }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .file-input-container {
+            border: 2px dashed #10b981;
+            padding: 25px;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #f0fdf4;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .file-input-container input { display: none; }
+        button {
+            display: block;
+            width: 100%;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 15px;
+        }
+        button:hover { background-color: #059669; }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        #countdown {
+            text-align: center; font-size: 24px; font-weight: bold; color: #d97706; margin: 20px 0; display: none;
+        }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+        .tableau { margin-top: 20px; display: grid; grid-template-columns: 1fr; gap: 15px; }
+        .match {
+            background: #f8fafc; border-left: 5px solid #10b981; padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); opacity: 0; transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .match.visible { opacity: 1; transform: translateY(0); }
+        .match-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; font-weight: bold; }
+        .team {
+            padding: 10px 12px; margin: 6px 0; background: white; border: 1px solid #e2e8f0;
+            border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 15px;
+        }
+        .ts { background-color: #f0fdf4; border-color: #bbf7d0; font-weight: bold; color: #166534; }
+        .badge { font-size: 11px; background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; }
+        .poids { font-size: 12px; color: #64748b; font-style: italic; }
+        .list-paires { font-size: 13px; color: #475569; margin-top: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Tirage au Sort Officiel Padel</h1>
+    
+    <div class="container">
+        <h2>1. Importez le fichier Excel</h2>
+        <div class="file-input-container" onclick="document.getElementById('excel-file').click()">
+            <strong style="color: #059669;">👉 Cliquez ici pour charger "inscriptions (5).xls"</strong>
+            <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">(Lecture directe de l'onglet Inscriptions)</p>
+            <input type="file" id="excel-file" accept=".xls,.xlsx">
+        </div>
+        <div id="file-status" style="text-align:center; font-weight:bold; color: #16a34a; margin-bottom: 15px;"></div>
+        <div id="paires-detectees" class="list-paires"></div>
+        
+        <button id="btn-tirage" onclick="demarrerAnimation()" disabled>🎰 Lancer le Tirage au Sort Animé</button>
+    </div>
+
+    <div id="countdown"><span class="blink">Mélange des paires en cours...</span> <br><span id="timer">3</span>s</div>
+
+    <div class="container" id="resultats" style="display:none;">
+        <h2>Tableau des Quarts de Finale</h2>
+        <div class="tableau" id="tableau-equipes"></div>
+    </div>
+
+    <script>
+        let pairesGlobales = [];
+
+        document.getElementById('excel-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheetName = workbook.SheetNames.includes('Inscriptions') ? 'Inscriptions' : workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                processExcelData(json);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function processExcelData(data) {
+            pairesGlobales = [];
+            data.forEach(row => {
+                const poids = row['Poids paire'];
+                if (poids !== undefined && row['Nom J1'] && row['Nom J2']) {
+                    pairesGlobales.push({
+                        j1_nom: row['Nom J1'].toUpperCase(),
+                        j1_prenom: row['Prénom J1'] || '',
+                        j2_nom: row['Nom J2'].toUpperCase(),
+                        j2_prenom: row['Prénom J2'] || '',
+                        poids: parseInt(poids)
+                    });
+                }
+            });
+
+            pairesGlobales.sort((a, b) => a.poids - b.poids);
+
+            if (pairesGlobales.length < 8) {
+                alert("Erreur : Le fichier doit contenir au moins 8 paires valides.");
+                return;
+            }
+
+            document.getElementById('file-status').innerText = `✔️ Fichier synchronisé ! ${pairesGlobales.length} paires détectées.`;
+            
+            let htmlPreview = "<strong>Liste des paires importées :</strong><ol>";
+            pairesGlobales.forEach((p, idx) => {
+                const label = idx < 4 ? `<strong>TS${idx+1}</strong>` : `P${idx+1}`;
+                htmlPreview += `<li>${p.j1_nom} ${p.j1_prenom} / ${p.j2_nom} ${p.j2_prenom} <span class="poids">(Poids: ${p.poids} - ${label})</span></li>`;
+            });
+            htmlPreview += "</ol>";
+            document.getElementById('paires-detectees').innerHTML = htmlPreview;
+            
+            document.getElementById('btn-tirage').disabled = false;
+        }
+
+        function melanger(tableau) { return tableau.sort(() => Math.random() - 0.5); }
+
+        function demarrerAnimation() {
+            const btn = document.getElementById('btn-tirage');
+            const countdownZone = document.getElementById('countdown');
+            const timerSpan = document.getElementById('timer');
+            const resultatsZone = document.getElementById('resultats');
+            
+            btn.disabled = true;
+            resultatsZone.style.display = 'none';
+            countdownZone.style.display = 'block';
+            let tempsRestant = 3;
+            timerSpan.innerText = tempsRestant;
+
+            const interval = setInterval(() => {
+                tempsRestant--;
+                timerSpan.innerText = tempsRestant;
+                if (tempsRestant === 0) {
+                    clearInterval(interval);
+                    countdownZone.style.display = 'none';
+                    btn.disabled = false;
+                    executerTirage();
+                }
+            }, 1000);
+        }
+
+        function executerTirage() {
+            const getEquipeNom = (p) => `${p.j1_nom} ${p.j1_prenom} / ${p.j2_nom} ${p.j2_prenom}`;
+            
+            const ts1 = getEquipeNom(pairesGlobales[0]);
+            const ts2 = getEquipeNom(pairesGlobales[1]);
+            const ts3 = getEquipeNom(pairesGlobales[2]);
+            const ts4 = getEquipeNom(pairesGlobales[3]);
+            
+            const outsiders = [
+                { nom: getEquipeNom(pairesGlobales[4]), label: 'P5' },
+                { nom: getEquipeNom(pairesGlobales[5]), label: 'P6' },
+                { nom: getEquipeNom(pairesGlobales[6]), label: 'P7' },
+                { nom: getEquipeNom(pairesGlobales[7]), label: 'P8' }
+            ];
+
+            const outsidersMelanges = melanger([...outsiders]);
+
+            let hautTS, basTS;
+            if (Math.random() < 0.5) {
+                hautTS = { nom: ts3, label: 'TS3' };
+                basTS = { nom: ts4, label: 'TS4' };
+            } else {
+                hautTS = { nom: ts4, label: 'TS4' };
+                basTS = { nom: ts3, label: 'TS3' };
+            }
+
+            const tableauFinal = [
+                { nom: ts2, isTS: true, label: 'TS2' },                                            
+                { nom: outsidersMelanges[0].nom, isTS: false, label: outsidersMelanges[0].label },  
+                { nom: hautTS.nom, isTS: true, label: hautTS.label },                              
+                { nom: outsidersMelanges[1].nom, isTS: false, label: outsidersMelanges[1].label },  
+                { nom: outsidersMelanges[2].nom, isTS: false, label: outsidersMelanges[2].label },  
+                { nom: basTS.nom, isTS: true, label: basTS.label },                                
+                { nom: outsidersMelanges[3].nom, isTS: false, label: outsidersMelanges[3].label },  
+                { nom: ts1, isTS: true, label: 'TS1' }                                             
+            ];
+
+            let html = '';
+            for (let i = 0; i < 8; i += 2) {
+                const eq1 = tableauFinal[i];
+                const eq2 = tableauFinal[i+1];
+                
+                html += `
+                    <div class="match" id="match-${i/2}">
+                        <div class="match-title">Quart de finale n°${(i/2)+1}</div>
+                        <div class="team ${eq1.isTS ? 'ts' : ''}">
+                            <span>${eq1.nom}</span> 
+                            <span class="${eq1.isTS ? 'badge' : 'poids'}">${eq1.label}</span>
+                        </div>
+                        <div class="team ${eq2.isTS ? 'ts' : ''}">
+                            <span>${eq2.nom}</span> 
+                            <span class="${eq2.isTS ? 'badge' : 'poids'}">${eq2.label}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const resultatsZone = document.getElementById('resultats');
+            document.getElementById('tableau-equipes').innerHTML = html;
+            resultatsZone.style.display = 'block';
+            resultatsZone.scrollIntoView({ behavior: 'smooth' });
+
+            for (let i = 0; i < 4; i++) {
+                setTimeout(() => {
+                    const matchCard = document.getElementById(`match-${i}`);
+                    if (matchCard) matchCard.classList.add('visible');
+                }, i * 400);
+            }
+        }
+    </script>
+</body>
+</html>
